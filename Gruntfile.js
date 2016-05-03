@@ -40,6 +40,7 @@ module.exports = function(grunt) {
         unused: true,
         boss: true,
         eqnull: true,
+        laxbreak: true,
         globals: {}
       },
       akeraCrud:{
