@@ -1,0 +1,15 @@
+{
+    "target": "es6",
+    "module": "commonjs",
+    "declaration": true,
+    "rootDir": "src",
+    "exclude": ["node_modules", "dist"],
+    "out": "./doc",
+    "name": "Akera Push-Notification",
+    "version": true,
+    "ignoreCompilerErrors": true,
+    "mode": "file",
+    "hideGenerator": true,
+    "excludePrivate": true
+  }
+  
