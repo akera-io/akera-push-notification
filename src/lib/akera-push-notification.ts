@@ -1,4 +1,6 @@
-export function AkeraPush(akeraWebApp?, mainConfig?, withExpress?): void {
+import {Server, Namespace, Socket} from "socket.io";
+
+export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void {
   const self = this.init;
 
   this.init = function (config, router, withExpress): void {
@@ -18,7 +20,7 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress?): void {
     }
 
     const akeraApp = withExpress == true ? null : router.__app;
-    const io = withExpress == true ? router.io : akeraApp.app && akeraApp.app.io;
+    const io: Server = withExpress == true ? router.io : akeraApp.app && akeraApp.app.io;
 
     if (!io || !io.sockets) {
       throw new Error(
@@ -27,7 +29,7 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress?): void {
     }
     // default namespace if mounted as application middleware
     let nspName = "/";
-    let nsp = io.sockets;
+    let nsp: Namespace = io.sockets;
 
     config = config || {};
     config.route = nspName;
@@ -84,7 +86,7 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress?): void {
     }
   };
 
-  this.onConnect = function (socket): void {
+  this.onConnect = function (socket: Socket): void {
     if (self.config.channels) {
       const isAuthenticated = self.requireAuthentication(socket.request);
 
