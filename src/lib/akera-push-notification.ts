@@ -37,6 +37,7 @@ export default class AkeraPush extends WebMiddleware {
     });
   }
 
+  
   public initPush(config, router) {
     this.akeraApp = this.withExpress == true ? null : router.__app;
     const io: Server =
@@ -89,11 +90,11 @@ export default class AkeraPush extends WebMiddleware {
     console.log(this._config);
   }
 
-  requireAuthentication(req) {
+private requireAuthentication(req) {
     return req && req.session && (req.session.user || req.session.get("user"));
   }
 
-  log(level: any, msg: string) {
+private  log(level: any, msg: string) {
     if (this.akeraApp) {
       this.akeraApp.log(level, msg);
     } else {
@@ -101,7 +102,7 @@ export default class AkeraPush extends WebMiddleware {
     }
   }
 
-  onConnect(socket: Socket): void {
+  public onConnect(socket: Socket): void {
     if (this._config.channels) {
       const isAuthenticated = this.requireAuthentication(socket.request);
 
@@ -157,7 +158,7 @@ export default class AkeraPush extends WebMiddleware {
     }
   }
 
-  onDisconnect() {
+public  onDisconnect() {
     // do nothing if we still have clients
     for (const id in this.io.connected) {
       return id;
@@ -177,15 +178,15 @@ export default class AkeraPush extends WebMiddleware {
     );
   }
 
-  getChannelRoute(channel: string) {
+ private getChannelRoute(channel: string) {
     if (this._config.route == "/") {
       return "/" + channel;
     }
 
-    return this._config.route + "/" + channel;
+    return`${this._config.route} / ${channel}`;
   }
 
-  handleMessage(channel, data, socket) {
+ public handleMessage(channel, data, socket) {
     if (channel) {
       this.log(
         LogLevel.debug,
@@ -215,7 +216,7 @@ export default class AkeraPush extends WebMiddleware {
     }
   }
 
-  run4gl(procedure, event, data, responseChannel, broadcast, socket) {
+ public run4gl(procedure, event, data, responseChannel, broadcast, socket) {
     if (procedure && event) {
       if (!this.akeraApi) {
         return this.log(
@@ -338,7 +339,7 @@ export default class AkeraPush extends WebMiddleware {
     }
   }
 
-  broadcast(event, data, socket): void {
+ private broadcast(event, data, socket): void {
     if (event) {
       if (!socket) {
         this.io.emit(event, data);
