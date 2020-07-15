@@ -1,5 +1,6 @@
 import { Server, Namespace, Socket } from "socket.io";
 import { WebMiddleware } from "@akeraio/web-middleware";
+import {} from "@akeraio/web-session";
 import { Router } from "express";
 import { ConnectionPoolOptions, ConnectionPool, LogLevel } from "@akeraio/api";
 
@@ -14,7 +15,7 @@ export interface mainConfig {
   __broker?: string;
 }
 
-export default class AkeraPush extends WebMiddleware {
+export class AkeraPush extends WebMiddleware {
   private withExpress = false;
   private _router: Router;
   private _config: mainConfig;
@@ -37,7 +38,6 @@ export default class AkeraPush extends WebMiddleware {
     });
   }
 
-  
   public initPush(config, router) {
     this.akeraApp = this.withExpress == true ? null : router.__app;
     const io: Server =
@@ -90,11 +90,11 @@ export default class AkeraPush extends WebMiddleware {
     console.log(this._config);
   }
 
-private requireAuthentication(req) {
+  private requireAuthentication(req: Express.Request): boolean {
     return req && req.session && (req.session.user || req.session.get("user"));
   }
 
-private  log(level: any, msg: string) {
+  private log(level: any, msg: string) {
     if (this.akeraApp) {
       this.akeraApp.log(level, msg);
     } else {
@@ -158,7 +158,7 @@ private  log(level: any, msg: string) {
     }
   }
 
-public  onDisconnect() {
+  public onDisconnect() {
     // do nothing if we still have clients
     for (const id in this.io.connected) {
       return id;
@@ -178,15 +178,15 @@ public  onDisconnect() {
     );
   }
 
- private getChannelRoute(channel: string) {
+  private getChannelRoute(channel: string) {
     if (this._config.route == "/") {
       return "/" + channel;
     }
 
-    return`${this._config.route} / ${channel}`;
+    return `${this._config.route} / ${channel}`;
   }
 
- public handleMessage(channel, data, socket) {
+  public handleMessage(channel, data, socket) {
     if (channel) {
       this.log(
         LogLevel.debug,
@@ -216,7 +216,7 @@ public  onDisconnect() {
     }
   }
 
- public run4gl(procedure, event, data, responseChannel, broadcast, socket) {
+  public run4gl(procedure, event, data, responseChannel, broadcast, socket) {
     if (procedure && event) {
       if (!this.akeraApi) {
         return this.log(
@@ -339,7 +339,7 @@ public  onDisconnect() {
     }
   }
 
- private broadcast(event, data, socket): void {
+  private broadcast(event, data, socket): void {
     if (event) {
       if (!socket) {
         this.io.emit(event, data);

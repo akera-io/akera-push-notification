@@ -1,1 +1,1 @@
-//module.exports = require('./lib/akera-push-notification.ts');
+export * from "./lib/akera-push-notification";
