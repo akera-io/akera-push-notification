@@ -1,26 +1,48 @@
-import {Server, Namespace, Socket} from "socket.io";
+import { Server, Namespace, Socket } from "socket.io";
+import { WebMiddleware } from "@akeraio/web-middleware";
+import { Router } from "express";
+import { ConnectionPoolOptions, ConnectionPool } from "@akeraio/api";
 
-export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void {
-  const self = this.init;
+export interface ApiOption extends ConnectionPool {
+  call: any;
+  connect: any;
+}
 
-  this.init = function (config, router, withExpress): void {
-    if (!router) {
-      if (withExpress == true) {
-        throw new Error("Invalid Express application.");
-      }
+export interface mainConfig {
+  channels?: any;
+  route?: string;
+  __broker?: string;
+}
 
-      throw new Error("Invalid Akera web service router.");
+export default class AkeraPush extends WebMiddleware {
+  private withExpress = false;
+  private _router: Router;
+  private _config: mainConfig;
+  private akeraApi: ApiOption;
+  private akeraApp: any;
+  private io: any;
+  private broker: string;
+
+  public constructor(config: mainConfig) {
+    super();
+    this._config = config;
+  }
+
+  public mount(config: ConnectionPoolOptions | ConnectionPool): Router {
+    if (this._router) {
+      return this._router;
     }
+    this._router = Router({
+      mergeParams: true,
+    });
+  }
 
-    if (
-      !withExpress &&
-      (!router.__app || typeof router.__app.require != "function")
-    ) {
-      throw new Error("Invalid Akera web service router.");
-    }
-
-    const akeraApp = withExpress == true ? null : router.__app;
-    const io: Server = withExpress == true ? router.io : akeraApp.app && akeraApp.app.io;
+  public initPush(config, router) {
+    this.akeraApp = this.withExpress == true ? null : router.__app;
+    const io: Server =
+      this.withExpress == true
+        ? router.io
+        : this.akeraApp.app && this.akeraApp.app.io;
 
     if (!io || !io.sockets) {
       throw new Error(
@@ -33,31 +55,25 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
 
     config = config || {};
     config.route = nspName;
-
-    // api module is required to call 4gl business logic directly
-    try {
-      self.akeraApi = akeraApp
-        ? akeraApp.require("akera-api")
-        :akeraApp.require("akera-api");
-    } catch (err) {err.message}
+    this._config = config;
 
     // if mounted as broker level create a 'namespace' for it
-    if (router.__broker) {
-      nspName += router.__broker.alias || router.__broker.name;
+    if (router._broker) {
+      nspName += router._broker.alias || router._broker.name;
       nsp = io.of(nspName);
-      router.__broker.io = nsp;
+      router._broker.io = nsp;
 
-      self.broker = router.__broker;
+      this.broker = router._broker;
     }
 
     // add validation middleware if authentication required
     if (config.requireAuthentication) {
       nsp.use(function (socket, next) {
-        if (self.requireAuthentication(socket.request)) {
+        if (this.requireAuthentication(socket.request)) {
           return next();
         }
 
-        self.log(
+        this.log(
           "error",
           `Socket.io unauthenticated connection on   ${nspName}`
         );
@@ -65,51 +81,50 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
       });
     }
 
-    nsp.on("connection", self.onConnect);
+    nsp.on("connection", this.onConnect);
 
-    self.io = nsp;
-    self.config = config;
-    self.akeraApp = akeraApp;
+    this.io = nsp;
+    this._config = config;
 
-    console.log(config);
-  };
+    console.log(this._config);
+  }
 
-  this.requireAuthentication = function (req) {
+  requireAuthentication(req) {
     return req && req.session && (req.session.user || req.session.get("user"));
-  };
+  }
 
-  this.log = function (level, msg): void {
-    if (self.akeraApp) {
-      self.akeraApp.log(level, msg);
+  log(level: string, msg: string) {
+    if (this.akeraApp) {
+      this.akeraApp.log(level, msg);
     } else {
       console.log(level, msg);
     }
-  };
+  }
 
-  this.onConnect = function (socket: Socket): void {
-    if (self.config.channels) {
-      const isAuthenticated = self.requireAuthentication(socket.request);
+  onConnect(socket: Socket): void {
+    if (this._config.channels) {
+      const isAuthenticated = this.requireAuthentication(socket.request);
 
-      self.config.channels.forEach(function (channel) {
+      this._config.channels.forEach(function (channel) {
         // enable message handlers for public channels or if authenticated
         if (isAuthenticated || !channel.requireAuthentication) {
           socket.on(channel.name, function (data): void {
-            self.handleMessage(channel, data, socket);
+            this.handleMessage(channel, data, socket);
           });
         } else {
-          self.log(
+          this.log(
             "debug",
             `Skipping unauthenticated for non public channel: 
-              ${self.getChannelRoute(channel.name)}`
+              ${this.getChannelRoute(channel.name)}`
           );
         }
 
         // set timers for long polling channels
         if (!channel._pollingTimer && channel.pollingInterval > 0) {
-          self.log(
+          this.log(
             "debug",
             `Set long polling trigger on: 
-              ${self.getChannelRoute(channel.name)}
+              ${this.getChannelRoute(channel.name)}
                for  
               ${channel.pollingInterval}`
           );
@@ -117,16 +132,16 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
             if (channel.run4gl && channel.run4gl.pollingApi) {
               channel.run4gl.pollingChannel =
                 channel.run4gl.pollingChannel || channel.name;
-              self.log(
+              this.log(
                 "debug",
                 `Fire long polling 4gl trigger on: 
-                  ${self.getChannelRoute(channel.name)} 
+                  ${this.getChannelRoute(channel.name)} 
                    -  
                   ${channel.run4gl.pollingApi}`
               );
               // always broadcast long pool messages, there is no originator in
               // this case
-              self.run4gl(
+              this.run4gl(
                 channel.run4gl.pollingApi,
                 channel.name,
                 null,
@@ -138,48 +153,48 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
         }
       });
 
-      socket.on("disconnect", self.onDisconnect);
+      socket.on("disconnect", this.onDisconnect);
     }
-  };
+  }
 
-  this.onDisconnect = function () {
+  onDisconnect() {
     // do nothing if we still have clients
-    for (const id in self.io.connected) {
+    for (const id in this.io.connected) {
       return id;
     }
 
     // disable timers for long polling channels
-    self.config.channels.forEach(function (channel) {
+    this._config.channels.forEach(function (channel) {
       if (channel._pollingTimer) {
         clearInterval(channel._pollingTimer);
         delete channel._pollingTimer;
       }
     });
 
-    self.log(
+    this.log(
       "verbose",
-      `All socket.io connections closed on: ${self.config.route}`
+      `All socket.io connections closed on: ${this._config.route}`
     );
-  };
+  }
 
-  this.getChannelRoute = function (channel) {
-    if (self.config.route == "/") {
+  getChannelRoute(channel: string) {
+    if (this._config.route == "/") {
       return "/" + channel;
     }
 
-    return self.config.route + "/" + channel;
-  };
+    return this._config.route + "/" + channel;
+  }
 
-  this.handleMessage = function (channel, data, socket) {
+  handleMessage(channel, data, socket) {
     if (channel) {
-      self.log(
+      this.log(
         "debug",
-        `Message received on: ${self.getChannelRoute(channel.name)}`
+        `Message received on: ${this.getChannelRoute(channel.name)}`
       );
 
       // broadcast channel, let everyone else know about it
       if (channel.broadcast === true) {
-        self.broadcast(channel.name, data, socket);
+        this.broadcast(channel.name, data, socket);
       }
 
       // 4gl business logic
@@ -188,7 +203,7 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
           channel.run4gl.messageChannel || channel.name;
         channel.run4gl.messageBroadcast =
           channel.run4gl.messageBroadcast || channel.broadcast;
-        self.run4gl(
+        this.run4gl(
           channel.run4gl.messageApi,
           channel.name,
           data,
@@ -198,41 +213,34 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
         );
       }
     }
-  };
+  }
 
-  this.run4gl = function (
-    procedure,
-    event,
-    data,
-    responseChannel,
-    broadcast,
-    socket
-  ) {
+  run4gl(procedure, event, data, responseChannel, broadcast, socket) {
     if (procedure && event) {
-      if (!self.akeraApi) {
-        return self.log(
+      if (!this.akeraApi) {
+        return this.log(
           "error",
           "akera.io API module is not available, please install that using npm install first."
         );
       }
 
       const broker =
-        self.broker ||
+        this.broker ||
         (socket && socket.request && socket.request.broker) ||
-        self.config.broker;
+        this._config.__broker;
 
       if (!broker) {
-        return self.log(
+        return this.log(
           "error",
           `No akera.io broker configuration set, unable to make 4gl api call for:
-           ${self.getChannelRoute(event)}`
+           ${this.getChannelRoute(event)}`
         );
       }
 
-      const p = self.akeraApi.call.parameter;
+      const p = this.akeraApi.call.parameter;
       let apiConn = null;
 
-      self.akeraApi
+      this.akeraApi
         .connect(broker)
         .then(function (conn) {
           apiConn = conn;
@@ -242,9 +250,9 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
           // - out, event name (character)
           // - out, broadcast flag (logical)
           // - out, output message (longchar)
-          self.log(
+          this.log(
             "debug",
-            ` Run 4gl trigger on:  ${self.getChannelRoute(event)} -  ${data}`
+            ` Run 4gl trigger on:  ${this.getChannelRoute(event)} -  ${data}`
           );
 
           return conn.call
@@ -267,10 +275,10 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
             ? response.parameters[2].trim()
             : null;
 
-          self.log(
+          this.log(
             "debug",
             `Callback from 4gl trigger on: 
-              ${self.getChannelRoute(event)} 
+              ${this.getChannelRoute(event)} 
                - 
               ${data4gl}`
           );
@@ -279,7 +287,9 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
           if (data4gl && data4gl.length > 0) {
             try {
               data4gl = JSON.parse(data4gl);
-            } catch (err) {err.message}
+            } catch (err) {
+              err.message;
+            }
 
             // initial channel/event used as default if not updated by the
             // server
@@ -289,53 +299,53 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
 
             // if broadcast send to everyone, including the originator
             if (broadcast === true) {
-              self.log(
+              this.log(
                 "debug",
                 `Broadcast from 4gl trigger on: 
-                  ${self.getChannelRoute(responseChannel)} 
+                  ${this.getChannelRoute(responseChannel)} 
                    - 
                   ${data4gl}`
               );
-              return self.broadcast(responseChannel, data4gl);
+              return this.broadcast(responseChannel, data4gl);
             }
             // if not to be broadcasted send it to the originator only
             if (socket) {
-              self.log(
+              this.log(
                 "debug",
                 `Responding from 4gl trigger on:
-                  ${self.getChannelRoute(responseChannel)} 
+                  ${this.getChannelRoute(responseChannel)} 
                   - 
                   ${data4gl}`
               );
               socket.emit(responseChannel, data4gl);
             }
           }
-        })
-        socket.catch(function (err) {
-          if (socket) {
-            socket.emit(event, {
-              error: err.message,
-            });
-          }
-
-          self.log("error", err.message);
-        })
-        socket.finally(function () {
-          if (apiConn) {
-            apiConn.disconnect();
-          }
         });
-    }
-  };
+      socket.catch(function (err) {
+        if (socket) {
+          socket.emit(event, {
+            error: err.message,
+          });
+        }
 
-  this.broadcast = function (event, data, socket):void {
+        this.log("error", err.message);
+      });
+      socket.finally(function () {
+        if (apiConn) {
+          apiConn.disconnect();
+        }
+      });
+    }
+  }
+
+  broadcast(event, data, socket): void {
     if (event) {
       if (!socket) {
-        self.io.emit(event, data);
+        this.io.emit(event, data);
       } else {
         // broadcast the event to all but the originator
-        for (const id in self.io.connected) {
-          const conn = self.io.connected[id];
+        for (const id in this.io.connected) {
+          const conn = this.io.connected[id];
 
           if (conn !== socket) {
             conn.emit(event, data);
@@ -343,29 +353,5 @@ export function AkeraPush(akeraWebApp?, mainConfig?, withExpress = false): void 
         }
       }
     }
-  };
-
-  if (akeraWebApp !== undefined) {
-    if (withExpress === true) {
-      return this.init(mainConfig, akeraWebApp, true);
-    }
-
-    // mounted as application level service
-    let AkeraWeb = null;
-
-    try {
-      AkeraWeb = akeraWebApp.require("akera-web");
-    } catch (err) {err.message}
-
-    if (!AkeraWeb || !(akeraWebApp instanceof AkeraWeb)) {
-      throw new Error("Invalid Akera web service instance");
-    }
-
-    this.init(mainConfig, akeraWebApp.router);
   }
 }
-
-AkeraPush.init = function (config, router) {
-  const akeraPush = new AkeraPush();
-  akeraPush.init(config, router);
-};
