@@ -1,7 +1,7 @@
 import { Server, Namespace, Socket } from "socket.io";
 import { WebMiddleware } from "@akeraio/web-middleware";
 import { Router } from "express";
-import { ConnectionPoolOptions, ConnectionPool } from "@akeraio/api";
+import { ConnectionPoolOptions, ConnectionPool, LogLevel } from "@akeraio/api";
 
 export interface ApiOption extends ConnectionPool {
   call: any;
@@ -74,7 +74,7 @@ export default class AkeraPush extends WebMiddleware {
         }
 
         this.log(
-          "error",
+          LogLevel.error,
           `Socket.io unauthenticated connection on   ${nspName}`
         );
         next(new Error("Authentication required."));
@@ -93,7 +93,7 @@ export default class AkeraPush extends WebMiddleware {
     return req && req.session && (req.session.user || req.session.get("user"));
   }
 
-  log(level: string, msg: string) {
+  log(level: any, msg: string) {
     if (this.akeraApp) {
       this.akeraApp.log(level, msg);
     } else {
@@ -113,7 +113,7 @@ export default class AkeraPush extends WebMiddleware {
           });
         } else {
           this.log(
-            "debug",
+            LogLevel.debug,
             `Skipping unauthenticated for non public channel: 
               ${this.getChannelRoute(channel.name)}`
           );
@@ -122,7 +122,7 @@ export default class AkeraPush extends WebMiddleware {
         // set timers for long polling channels
         if (!channel._pollingTimer && channel.pollingInterval > 0) {
           this.log(
-            "debug",
+            LogLevel.debug,
             `Set long polling trigger on: 
               ${this.getChannelRoute(channel.name)}
                for  
@@ -133,7 +133,7 @@ export default class AkeraPush extends WebMiddleware {
               channel.run4gl.pollingChannel =
                 channel.run4gl.pollingChannel || channel.name;
               this.log(
-                "debug",
+                LogLevel.debug,
                 `Fire long polling 4gl trigger on: 
                   ${this.getChannelRoute(channel.name)} 
                    -  
@@ -172,7 +172,7 @@ export default class AkeraPush extends WebMiddleware {
     });
 
     this.log(
-      "verbose",
+      LogLevel.verbose,
       `All socket.io connections closed on: ${this._config.route}`
     );
   }
@@ -188,7 +188,7 @@ export default class AkeraPush extends WebMiddleware {
   handleMessage(channel, data, socket) {
     if (channel) {
       this.log(
-        "debug",
+        LogLevel.debug,
         `Message received on: ${this.getChannelRoute(channel.name)}`
       );
 
@@ -219,7 +219,7 @@ export default class AkeraPush extends WebMiddleware {
     if (procedure && event) {
       if (!this.akeraApi) {
         return this.log(
-          "error",
+          LogLevel.error,
           "akera.io API module is not available, please install that using npm install first."
         );
       }
@@ -231,7 +231,7 @@ export default class AkeraPush extends WebMiddleware {
 
       if (!broker) {
         return this.log(
-          "error",
+          LogLevel.error,
           `No akera.io broker configuration set, unable to make 4gl api call for:
            ${this.getChannelRoute(event)}`
         );
@@ -251,7 +251,7 @@ export default class AkeraPush extends WebMiddleware {
           // - out, broadcast flag (logical)
           // - out, output message (longchar)
           this.log(
-            "debug",
+            LogLevel.debug,
             ` Run 4gl trigger on:  ${this.getChannelRoute(event)} -  ${data}`
           );
 
@@ -276,7 +276,7 @@ export default class AkeraPush extends WebMiddleware {
             : null;
 
           this.log(
-            "debug",
+            LogLevel.debug,
             `Callback from 4gl trigger on: 
               ${this.getChannelRoute(event)} 
                - 
@@ -311,7 +311,7 @@ export default class AkeraPush extends WebMiddleware {
             // if not to be broadcasted send it to the originator only
             if (socket) {
               this.log(
-                "debug",
+                LogLevel.debug,
                 `Responding from 4gl trigger on:
                   ${this.getChannelRoute(responseChannel)} 
                   - 
@@ -328,7 +328,7 @@ export default class AkeraPush extends WebMiddleware {
           });
         }
 
-        this.log("error", err.message);
+        this.log(LogLevel.error, err.message);
       });
       socket.finally(function () {
         if (apiConn) {
