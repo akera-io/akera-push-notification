@@ -4,7 +4,6 @@ import {} from "@akeraio/web-session";
 import { Router } from "express";
 import { ConnectionPoolOptions, ConnectionPool, LogLevel } from "@akeraio/api";
 
-
 export interface ApiOption extends ConnectionPool {
   call: any;
   connect: any;
@@ -15,30 +14,30 @@ export interface mainConfig extends channelConfig {
   route?: string;
   __broker?: string;
 }
-export interface socketConfig extends Socket{
-  catch:any;
-  finally:any;
-  emit:any;
+export interface socketConfig extends Socket {
+  catch: any;
+  finally: any;
+  emit: any;
 }
 
 export interface channelConfig {
-  name:string;
+  name: string;
   requireAuthentication: true;
   pollingInterval: 20000;
-  _pollingTimer:any;
+  _pollingTimer: any;
   run4gl: {
     messageApi: "api/push.p";
     messageBroadcast: boolean;
-    messageChannel:string; 
+    messageChannel: string;
     pollingApi: "api/pushPoll.p";
     pollingChannel: Event | string;
-    }
-    broadcast:boolean;
-    forEach:any;
+  };
+  broadcast: boolean;
+  forEach: any;
 }
 
 export class AkeraPush extends WebMiddleware {
-  private withExpress: boolean = false;
+  private withExpress = false;
   private _router: Router;
   private _config: mainConfig;
   private akeraApi: ApiOption;
@@ -60,7 +59,7 @@ export class AkeraPush extends WebMiddleware {
     });
   }
 
-  public initPush(config:mainConfig, router) {
+  public initPush(config: mainConfig, router) {
     this.akeraApp = this.withExpress == true ? null : router.__app;
     const io: Server =
       this.withExpress == true
@@ -91,7 +90,7 @@ export class AkeraPush extends WebMiddleware {
 
     // add validation middleware if authentication required
     if (config.requireAuthentication) {
-      nsp.use(function (socket, next) {
+      nsp.use(function (socket, next): void {
         if (this.requireAuthentication(socket.request)) {
           return next();
         }
@@ -128,10 +127,10 @@ export class AkeraPush extends WebMiddleware {
     if (this._config.channels) {
       const isAuthenticated = this.requireAuthentication(socket.request);
 
-      this._config.channels.forEach(function (channel:channelConfig) {
+      this._config.channels.forEach(function (channel: channelConfig) {
         // enable message handlers for public channels or if authenticated
         if (isAuthenticated || !channel.requireAuthentication) {
-          socket.on(channel.name, function (data:string): void {
+          socket.on(channel.name, function (data: string): void {
             this.handleMessage(channel, data, socket);
           });
         } else {
@@ -187,7 +186,7 @@ export class AkeraPush extends WebMiddleware {
     }
 
     // disable timers for long polling channels
-    this._config.channels.forEach(function (channel:channelConfig) {
+    this._config.channels.forEach(function (channel: channelConfig): void {
       if (channel._pollingTimer) {
         clearInterval(channel._pollingTimer);
         delete channel._pollingTimer;
@@ -200,7 +199,7 @@ export class AkeraPush extends WebMiddleware {
     );
   }
 
-  public getChannelRoute(channel:channelConfig) {
+  public getChannelRoute(channel: channelConfig) {
     if (this._config.route == "/") {
       return "/" + channel;
     }
@@ -208,7 +207,11 @@ export class AkeraPush extends WebMiddleware {
     return `${this._config.route} / ${channel}`;
   }
 
-  public handleMessage(channel:channelConfig, data:string, socket:socketConfig) {
+  public handleMessage(
+    channel: channelConfig,
+    data: string,
+    socket: socketConfig
+  ) {
     if (channel) {
       this.log(
         LogLevel.debug,
@@ -216,7 +219,7 @@ export class AkeraPush extends WebMiddleware {
       );
 
       // broadcast channel, let everyone else know about it
-      if (channel.broadcast ===true) {
+      if (channel.broadcast === true) {
         this.broadcast(channel.name, data, socket);
       }
 
@@ -238,7 +241,14 @@ export class AkeraPush extends WebMiddleware {
     }
   }
 
-  public run4gl(procedure, event:channelConfig, data:string, responseChannel:string, broadcast:boolean, socket:socketConfig) {
+  public run4gl(
+    procedure: string,
+    event: channelConfig,
+    data: string,
+    responseChannel: string,
+    broadcast: boolean,
+    socket: socketConfig
+  ): void {
     if (procedure && event) {
       if (!this.akeraApi) {
         return this.log(
@@ -265,7 +275,7 @@ export class AkeraPush extends WebMiddleware {
 
       this.akeraApi
         .connect(broker)
-        .then(function (conn) {
+        .then(function (conn): void {
           apiConn = conn;
           // call 4gl procedure, need to have this predefined signature
           // - in, event name (character)
@@ -289,7 +299,7 @@ export class AkeraPush extends WebMiddleware {
             )
             .run();
         })
-        .then(function (response) {
+        .then(function (response): void {
           let event4gl = response.parameters[0]
             ? response.parameters[0].trim()
             : null;
@@ -344,7 +354,7 @@ export class AkeraPush extends WebMiddleware {
             }
           }
         });
-      socket.catch(function (err:Error) {
+      socket.catch(function (err: Error): void {
         if (socket) {
           socket.emit(event, {
             error: err.message,
@@ -353,7 +363,7 @@ export class AkeraPush extends WebMiddleware {
 
         this.log(LogLevel.error, err.message);
       });
-      socket.finally(function () {
+      socket.finally(function (): void {
         if (apiConn) {
           apiConn.disconnect();
         }
@@ -361,7 +371,7 @@ export class AkeraPush extends WebMiddleware {
     }
   }
 
-  public broadcast(event:Event|string, data:string, socket:Socket): void {
+  public broadcast(event: Event | string, data: string, socket: Socket): void {
     if (event) {
       if (!socket) {
         this.io.emit(event, data);
