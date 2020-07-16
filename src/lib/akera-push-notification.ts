@@ -62,7 +62,6 @@ export interface ChannelConfig {
 }
 
 export class AkeraPush extends WebMiddleware {
-  private withExpress = false;
   private _router: Router;
   private _config: mainConfig;
   private io: Namespace;
@@ -89,8 +88,8 @@ export class AkeraPush extends WebMiddleware {
       );
     }
     // default namespace if mounted as application middleware
-    let nspName = "/";
-    let nsp: Namespace = this.io;
+    const nspName = "/";
+    const nsp: Namespace = this.io;
 
     config = config || null;
     this._config = config;
@@ -261,7 +260,7 @@ export class AkeraPush extends WebMiddleware {
       }
 
       const broker =
-        this._connectionPool.brokers ||
+        this._connectionPool.brokers.find ||
         (socket && socket.request && socket.request.broker);
 
       if (!broker) {
