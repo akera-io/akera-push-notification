@@ -81,7 +81,7 @@ export class AkeraPush extends WebMiddleware {
     });
   }
 
-  public initPush(config: mainConfig) {
+  public initPush(config: mainConfig) : void{
     if (!this.io || !this.io.sockets) {
       throw new Error(
         "socket.io handle not set, enable this in akera-web/express first."
@@ -121,7 +121,7 @@ export class AkeraPush extends WebMiddleware {
     return req && req.session && (req.session.user || req.session.get("user"));
   }
 
-  private log(level: any, msg: string) {
+  private log(level: LogLevel, msg: string) {
     if (akeraApi) {
       akeraApi.LogLevel;
     } else {
@@ -129,7 +129,7 @@ export class AkeraPush extends WebMiddleware {
     }
   }
 
-  public onConnect(socket: Socket) {
+  public onConnect(socket: Socket) : void{
     if (this._config.channels) {
       const isAuthenticated = this.requireAuthentication(socket.request);
 
@@ -185,7 +185,7 @@ export class AkeraPush extends WebMiddleware {
     }
   }
 
-  public onDisconnect() {
+  public onDisconnect():any {
     // do nothing if we still have clients
     for (const id in this.io.connected) {
       return id;
@@ -205,7 +205,7 @@ export class AkeraPush extends WebMiddleware {
     );
   }
 
-  public getChannelRoute(channel: ChannelConfig) {
+  public getChannelRoute(channel: ChannelConfig): any {
     if (this._config.route == "/") {
       return "/" + channel;
     }
@@ -213,7 +213,7 @@ export class AkeraPush extends WebMiddleware {
     return `${this._config.route} / ${channel}`;
   }
 
-  public handleMessage(channel: ChannelConfig, data: string, socket: Socket) {
+  public handleMessage(channel: ChannelConfig, data: string, socket: Socket) : void{
     if (channel) {
       this.log(
         LogLevel.debug,
@@ -250,7 +250,7 @@ export class AkeraPush extends WebMiddleware {
     responseChannel: string,
     broadcast: boolean,
     socket: Socket
-  ) {
+  ) : any{
     if (procedure && event) {
       if (!akeraApi) {
         return this.log(
@@ -371,7 +371,7 @@ export class AkeraPush extends WebMiddleware {
     }
   }
 
-  public broadcast(event: string, data: string, socket: Socket) {
+  public broadcast(event: string, data: string, socket: Socket) : void{
     if (event) {
       if (!socket) {
         this.io.emit(event, data);
