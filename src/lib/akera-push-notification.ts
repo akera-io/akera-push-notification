@@ -1,16 +1,14 @@
-import {  Namespace, Socket } from "socket.io";
+import { Namespace, Socket } from "socket.io";
 import { WebMiddleware } from "@akeraio/web-middleware";
 import {} from "@akeraio/web-session";
 import { Router } from "express";
 import { ConnectionPoolOptions, ConnectionPool, LogLevel } from "@akeraio/api";
 import * as akeraApi from "@akeraio/api";
 
-
-
 export interface mainConfig {
   channels?: ChannelConfig;
-  requireAuthentication?:true;
-  route?:string;
+  requireAuthentication?: true;
+  route?: string;
 }
 
 /**
@@ -69,7 +67,6 @@ export class AkeraPush extends WebMiddleware {
   private _config: mainConfig;
   private io: Namespace;
   private _connectionPool: ConnectionPool;
-  
 
   public constructor(config: mainConfig) {
     super();
@@ -86,8 +83,6 @@ export class AkeraPush extends WebMiddleware {
   }
 
   public initPush(config: mainConfig) {
-    
-
     if (!this.io || !this.io.sockets) {
       throw new Error(
         "socket.io handle not set, enable this in akera-web/express first."
@@ -99,7 +94,6 @@ export class AkeraPush extends WebMiddleware {
 
     config = config || null;
     this._config = config;
-   
 
     // add validation middleware if authentication required
     if (config.requireAuthentication) {
@@ -143,7 +137,7 @@ export class AkeraPush extends WebMiddleware {
       this._config.channels.forEach(function (channel: ChannelConfig) {
         // enable message handlers for public channels or if authenticated
         if (isAuthenticated || !channel.requireAuthentication) {
-          socket.on(channel.name, function (data: string){
+          socket.on(channel.name, function (data: string) {
             this.handleMessage(channel, data, socket);
           });
         } else {
@@ -265,12 +259,10 @@ export class AkeraPush extends WebMiddleware {
           "akera.io API module is not available, please install that using npm install first."
         );
       }
-      
 
       const broker =
         this._connectionPool.brokers ||
-        (socket && socket.request && socket.request.broker) 
-        
+        (socket && socket.request && socket.request.broker);
 
       if (!broker) {
         return this.log(
@@ -281,13 +273,12 @@ export class AkeraPush extends WebMiddleware {
       }
 
       const p = akeraApi.Parameter;
-      const q=akeraApi.DataType;
+      const q = akeraApi.DataType;
       let apiConn = null;
-      
 
       akeraApi
         .connect(broker)
-        .then(function (conn){
+        .then(function (conn) {
           apiConn = conn;
           // call 4gl procedure, need to have this predefined signature
           // - in, event name (character)
@@ -341,7 +332,6 @@ export class AkeraPush extends WebMiddleware {
             if (!event4gl || event4gl.length === 0) {
               event4gl = responseChannel || event;
             }
-      
 
             // if broadcast send to everyone, including the originator
             if (this.broadcast === true) {
@@ -367,21 +357,20 @@ export class AkeraPush extends WebMiddleware {
             }
           }
         });
-        socket.on('error', (error)=>{
+      socket.on("error", (error) => {
         if (socket) {
           socket.emit(error, {
-            error:error.message,
+            error: error.message,
           });
         }
 
         this.log(LogLevel.error, error.message);
       });
-      socket.on('disconnect', () => {
+      socket.on("disconnect", () => {
         apiConn;
       });
     }
   }
-  
 
   public broadcast(event: string, data: string, socket: Socket) {
     if (event) {
